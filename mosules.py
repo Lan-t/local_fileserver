@@ -62,9 +62,8 @@ class get_class(res_class):
         if 'drive' in keys: drive = query_dic['drive']
         if 'coding' in keys: self.coding = query_dic['coding']
         if 'urlcoding' in keys: url_coding = query_dic['urlcoding']
-        if 'dirdl' in keys:
-            if query_dic['dirdl'] == 'true':
-                self.zipflag = True
+        if ('type' in keys) and (query_dic['type'] == 'json'): self.content_type = 'text/json'
+        if ('dirdl' in keys) and (query_dic['dirdl'] == 'true'): self.zipflag = True
 
         self.path = self.parse_path_os(urllib.parse.unquote(parse_url.path, url_coding), drive)
 
@@ -76,6 +75,10 @@ class get_class(res_class):
                 self.set_res_head(200, 'application/zip')
                 return self.make_zip(self.path)
             
+            if self.content_type == 'text/json':
+                self.status_num = 200
+                return self.make_json(self.make_pathlist())
+
             self.set_res_head(200, 'text/html; charset='+self.coding)
             return self.make_html(self.make_pathlist())
 
@@ -133,7 +136,28 @@ f'''
         body += '</html>'
         return  body.encode(self.coding)
 
-    
+    def make_json(self, path_list):
+        path = self.path.replace('\\', '\\\\')
+        body = f'{{"request_path":"{path}"\n'
+
+        body += ',"directory":[\n'
+        for d in path_list[0]:
+            path = d.replace('\\', '\\\\')
+            body += f'"{path}",'
+        else:
+            body = body.rstrip(',') + ']'
+
+        body += ',"file":[\n'
+        for f in path_list[1]:
+            path = f.replace('\\', '\\\\')
+            body += f'"{path}",'
+        else:
+            body = body.rstrip(',') + ']'
+
+        body += '}'
+
+        return body.encode()
+
     def make_pathlist(self):
         path_list = [ i for i in glob.glob(self.path.rstrip(os.sep) + os.sep + '*') ]
         dir_list = []
@@ -177,18 +201,20 @@ class post_class(res_class):
         self.path = self.parse_path_os(urllib.parse.unquote(parse_url.path, url_coding), drive)
 
         self.post_data = data
-        self.status_num = 200
-        self.content_type = 'text/json'
+
+        self.set_res_head(200, 'text/json')
 
     def save_file(self):
+
+        path = self.path.replace('\\', '\\\\')
 
         if os.path.exists(self.path):
             if os.path.isdir(self.path):
                 return f'''
 {{
-    "state":-1
+    "state":-1,
     "message":"this_directory_is_exist",
-    "request_path":"{self.path}"
+    "request_path":"{path}"
 }}
 '''.encode()
 
@@ -200,9 +226,9 @@ class post_class(res_class):
 
                     return f'''
 {{
-    "state":0
-    "message":made_new_file"
-    "request_path":"{self.path}"
+    "state":0,
+    "message":"made_new_file",
+    "request_path":"{path}"
 }}
 '''.encode()
                 elif self.mode == 'w':
@@ -211,9 +237,9 @@ class post_class(res_class):
 
                     return f'''
 {{
-    "state":0
-    "message":over_write_file"
-    "request_path":"{self.path}"
+    "state":0,
+    "message":"over_write_file",
+    "request_path":"{path}"
 }}
 '''.encode()
 
@@ -223,9 +249,9 @@ class post_class(res_class):
             
             return f'''
 {{
-    "state":0
-    "message":make_new_directory"
-    "request_path":"{self.path}"
+    "state":0,
+    "message":"make_new_directory",
+    "request_path":"{path}"
 }}
 '''.encode()
 
@@ -240,17 +266,18 @@ class post_class(res_class):
             except PermissionError: return self.permission_error_message()
             return f'''
 {{
-    "state":0
-    "message":make_new_file"
-    "request_path":"{self.path}"
+    "state":0,
+    "message":"make_new_file",
+    "request_path":"{path}"
 }}
 '''.encode()
 
     def permission_error_message(self):
+        path = self.path.replace('\\', '\\\\')
         return f'''
 {{
-    "state":-1
-    "message":permission_error"
-    "request_path":"{self.path}"
+    "state":-1,
+    "message":"permission_error",
+    "request_path":"{path}"
 }}
 '''.encode()
