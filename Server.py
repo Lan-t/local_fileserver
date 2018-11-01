@@ -9,6 +9,19 @@ class MyHandler(SimpleHTTPRequestHandler):
 
         c = mosules.get_class(self.path)
         body = c.make_res_body()
+        
+        l = f'''\
+=======GET=======
+addr:     {str(self.client_address[0])}
+port:     {str(self.client_address[1])}
+date:     {self.date_time_string()}
+req_line: {self.requestline}
+-----headers-----
+{str(self.headers)}
+=================
+'''
+
+        log(l)
 
         self.send_response(c.status_num)
         self.send_header('Content-type', c.content_type)
@@ -28,12 +41,26 @@ class MyHandler(SimpleHTTPRequestHandler):
         c = mosules.post_class(self.path, data)
         body = c.save_file()
 
+        l = f'''\
+=======POST======
+addr:     {str(self.client_address[0])}
+port:     {str(self.client_address[1])}
+date:     {self.date_time_string()}
+req_line: {self.requestline}
+-----headers-----
+{str(self.headers)}
+=================
+'''
+
+        log(l)
         self.send_response(c.status_num)
         self.send_header('Content-type', c.content_type)
         self.send_header('Content-length', len(body))
         self.end_headers()
         self.wfile.write(body)
 
+def log(message):
+    open('log', 'a').write(message)
 
 host = ''
 port = 80
